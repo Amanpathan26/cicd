@@ -1,0 +1,29 @@
+name: First CI Workflow
+
+on:
+  push:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+  steps:
+    - name: Chheckout repository
+      uses: actions/checkout@v6
+
+    - name: Show repository
+      run: ls -la
+
+    - name: Runner information
+      run: |
+          echo "User:"
+          whoami
+
+          echo "Working directory:"
+          pwd
+
+          echo "Kernel:"
+          uname -a
+
+    - name: CI message
+      run: echo "My first GitHub Actions workflow is running!"
