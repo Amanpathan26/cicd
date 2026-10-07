@@ -7,15 +7,15 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-  steps:
-    - name: Chheckout repository
-      uses: actions/checkout@v6
+    steps:
+      - name: Chheckout repository
+        uses: actions/checkout@v6
 
-    - name: Show repository
-      run: ls -la
+      - name: Show repository
+        run: ls -la
 
-    - name: Runner information
-      run: |
+      - name: Runner information
+        run: |
           echo "User:"
           whoami
 
@@ -25,5 +25,5 @@ jobs:
           echo "Kernel:"
           uname -a
 
-    - name: CI message
-      run: echo "My first GitHub Actions workflow is running!"
+      - name: CI message
+        run: echo "My first GitHub Actions workflow is running!"
