@@ -1,18 +1,41 @@
-name: CI Diagnostic
+name: React CI
 
 on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  diagnostic:
+  validate:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Verify checkout
-        run: |
-          echo "Repository files:"
-          ls -la
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: react-dist
+          path: dist/
+          if-no-files-found: error
