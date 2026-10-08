@@ -9,8 +9,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check runner
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify checkout
         run: |
-          echo "Runner is working"
-          whoami
-          pwd
+          echo "Repository files:"
+          ls -la
