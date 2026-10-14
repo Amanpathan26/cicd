@@ -1,7 +1,9 @@
-name: React CI
+
+name: React Docker CI
 
 on:
   push:
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -15,7 +17,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -30,12 +32,46 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Build
+      - name: Build React
         run: npm run build
 
-      - name: Upload artifact
+      - name: Upload React artifact
         uses: actions/upload-artifact@v4
         with:
           name: react-dist
           path: dist/
           if-no-files-found: error
+
+  docker-build:
+    needs: validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: react-ci-demo:${{ github.sha }}
+
+      - name: Verify image exists
+        run: docker image inspect react-ci-demo:${{ github.sha }}
+
+      - name: Run container
+        run: |
+          docker run -d --name react-test -p 8080:80 react-ci-demo:${{ github.sha }}
+
+      - name: Verify application response
+        run: |
+          curl --fail --retry 10 --retry-delay 2 --retry-connrefused http://localhost:8080/
+
+      - name: Cleanup container
+        if: always()
+        run: docker rm -f react-test || true
