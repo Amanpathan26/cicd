@@ -61,8 +61,10 @@ jobs:
           load: true
           tags: react-ci-demo:${{ github.sha }}
 
+
       - name: Verify image exists
         run: docker image inspect react-ci-demo:${{ github.sha }}
+
 
       - name: Run container
         run: |
@@ -76,8 +78,24 @@ jobs:
           docker logs react-test || true
           docker inspect react-test --format '{{json .State}}' || true
       
+
       - name: Verify HTTP response
         run: curl --fail --retry 10 --retry-delay 2 --retry-connrefused --retry-all-errors http://localhost:8080/
+
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Publish Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: docker.io/${{ secrets.DOCKERHUB_USERNAME }}/react-ci-demo:${{ github.sha }}
+
 
       - name: Cleanup container
         if: always()
