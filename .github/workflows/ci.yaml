@@ -82,7 +82,6 @@ jobs:
       - name: Verify HTTP response
         run: curl --fail --retry 10 --retry-delay 2 --retry-connrefused --retry-all-errors http://localhost:8080/
 
-
       - name: Log in to Docker Hub
         if: github.event_name == 'push' && github.ref == 'refs/heads/react-ci-demo'
         uses: docker/login-action@v3
