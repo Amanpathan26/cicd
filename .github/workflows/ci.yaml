@@ -101,7 +101,6 @@ jobs:
         if: always()
         run: docker rm -f react-test || true
 
-
   deploy:
     needs: docker-build
     if: github.event_name == 'push' && github.ref == 'refs/heads/react-ci-demo'
