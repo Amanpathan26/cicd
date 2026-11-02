@@ -100,3 +100,65 @@ jobs:
       - name: Cleanup container
         if: always()
         run: docker rm -f react-test || true
+
+
+  deploy:
+    needs: docker-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/react-ci-demo'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Prepare SSH key
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      - name: Trust EC2 host key
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          IMAGE="docker.io/${DOCKERHUB_USERNAME}/react-ci-demo:${IMAGE_TAG}"
+
+          ssh -i ~/.ssh/deploy_key \
+            -o IdentitiesOnly=yes \
+            "$EC2_USER@$EC2_HOST" \
+            "IMAGE='$IMAGE' bash -s" <<'REMOTE'
+              set -e
+
+              echo "Pulling new image..."
+              docker pull "$IMAGE"
+
+              echo "Replacing old container..."
+              docker rm -f react-ci-demo || true
+
+              docker run -d \
+                --name react-ci-demo \
+                --restart unless-stopped \
+                -p 8080:80 \
+                "$IMAGE"
+
+              echo "Checking application health..."
+              for attempt in $(seq 1 15); do
+                if curl --fail --silent http://localhost:8080/ > /dev/null; then
+                  echo "Deployment successful!"
+                  exit 0
+                fi
+                sleep 2
+              done
+
+              echo "Health check failed."
+              docker logs react-ci-demo || true
+              exit 1
+          REMOTE
