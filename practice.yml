@@ -1,0 +1,218 @@
+jobs:
+
+  # Jobs outputs can be used in other jobs. For example, the build job sets an output called tag, which is then used in the deploy job.
+  build:
+    runs-on: ubuntu-latest
+
+    outputs:
+      tag: ${{ steps.set_tag.outputs.tag }}
+      other_output: ${{ steps.set_tag.outputs.other_output }}
+
+    steps:
+      - name: Set tag
+        id: set_tag
+        run: |
+          echo "tag=${GITHUB_SHA:0:7}" >> "$GITHUB_OUTPUT"
+          echo "other_output=some_value" >> "$GITHUB_OUTPUT"
+
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to EC2
+        run: echo "Deploying tag ${{ needs.build.outputs.tag }} to EC2"
+      - name: Deploy other output
+        run: echo "Deploying other output ${{ needs.build.outputs.other_output }} to EC2"
+
+  # Matrix build allows you to run the same job with different configurations. In this case, we are testing our application with multiple Node.js versions.
+  test:
+    runs-on: ubuntu-latest
+
+    # For one var -
+    strategy:
+      fail-fast: false #(by defaulte - true, false means that if one job fails, the others will continue to run)
+      max-parallel: 2 #(by default - 0, 0 means no limit, 2 means that only 2 jobs will run in parallel)
+      matrix:
+        node-version: [20, 22, 24]
+
+    # For two vars - ( 2 x 3 = 6 jobs will be created ) ( job-1 -> ubuntu-latest, node-20, job-2 -> ubuntu-latest, node-22, job-3 -> ubuntu-latest, node-24, job-4 -> windows-latest, node-20 ) 
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node-version: [20, 22]
+        exclude: # Exclude a specific combination of OS and Node.js version from the matrix. In this case, we are excluding the combination of Windows and Node.js 22.
+          - os: windows-latest
+            node-version: 22
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+
+
+
+    # Reusable workflow ( Create in centerizled repo ) -------------------------------------------------------------------------------
+    name: Reusable Deployment
+
+    on:
+      workflow_call:
+        inputs:
+          environment:
+            required: true
+            type: string
+
+          image:
+            required: true
+            type: string
+
+    jobs:
+      deploy:
+        runs-on: ubuntu-latest
+
+        environment: ${{ inputs.environment }}
+
+        steps:
+          - name: Deploy Docker image
+            run: |
+              echo "Deploying ${{ inputs.image }}"
+              echo "Target: ${{ inputs.environment }}"
+
+          - name: Health check
+            run: |
+              echo "Checking application health..."
+
+
+    # Caller workflow A ----
+    name: Deploy Development
+
+    on:
+      push:
+        branches:
+          - development
+
+    jobs:
+      deploy:
+        uses: organization/centerized-workflow-repo/.github/workflows/deploy.yml
+
+        with:
+          environment: development
+          image: registry.company.com/trading-ui:
+    # to allow reuseable workflow to use the secrets from the caller workflow, we need to add the following line in the caller workflow      
+    secrets: inherit
+
+
+
+    # Caller workflow B ----
+    name: Deploy Production
+
+    on:
+      workflow_dispatch:
+
+    jobs:
+      deploy:
+        uses: organization/centerized-workflow-repo/.github/workflows/deploy.yml
+
+        with:
+          environment: production
+          image: registry.company.com/trading-ui:a81f92c
+
+
+
+
+# Reuseable Custom GitHub actions ( Composite actions ) ---------------------------------------------------------------------------
+# also create in centerized repo --
+# setup-react/action.yml
+
+name: Setup React Project
+description: Setup Node.js and install React project dependencies
+
+inputs:
+  node-version:
+    description: Node.js version
+    required: false
+    default: '22'
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Install dependencies
+      shell: bash
+      run: npm ci
+
+# Caller to call composite action --
+name: React CI
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup React Project
+        uses: my-company/devops-actions/setup-react@v1
+        with:
+          node-version: '22'
+
+      - name: Run build
+        run: npm run build
+
+
+
+
+
+
+        # Timeout ---
+        name: React CI
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+        timeout-minutes: 5
+
+      - name: Run tests
+        run: npm test
+        timeout-minutes: 7
+
+      - name: Build application
+        run: npm run build
+        timeout-minutes: 7
